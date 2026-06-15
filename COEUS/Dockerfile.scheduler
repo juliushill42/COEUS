@@ -1,0 +1,23 @@
+FROM rust:1.79-slim AS builder
+WORKDIR /build
+RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+
+# Cache deps
+COPY Cargo.toml Cargo.lock ./
+COPY scheduler/Cargo.toml scheduler/
+COPY telemetry/Cargo.toml telemetry/
+RUN mkdir -p scheduler/src telemetry/src && \
+    echo "fn main(){}" > scheduler/src/main.rs && \
+    echo "fn main(){}" > telemetry/src/main.rs && \
+    cargo build --release --package coeus-scheduler 2>/dev/null || true
+
+# Full build
+COPY scheduler/src scheduler/src/
+RUN touch scheduler/src/main.rs && cargo build --release --package coeus-scheduler
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /build/target/release/coeus-scheduler /usr/local/bin/coeus-scheduler
+ENV COEUS_SCHEDULER_PORT=8080
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/coeus-scheduler"]

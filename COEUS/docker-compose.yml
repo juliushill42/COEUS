@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  scheduler:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.scheduler
+    ports:
+      - "8080:8080"
+    environment:
+      - COEUS_SCHEDULER_PORT=8080
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  telemetry:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.telemetry
+    ports:
+      - "8081:8081"
+    environment:
+      - COEUS_TELEMETRY_PORT=8081
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  router:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.router
+    ports:
+      - "8082:8082"
+    environment:
+      - COEUS_ROUTER_PORT=8082
+      - COEUS_EVICTION_POLICY=sla
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_SCHEDULER_URL=http://localhost:8080
+      - VITE_TELEMETRY_URL=http://localhost:8081
+      - VITE_ROUTER_URL=http://localhost:8082
+    depends_on:
+      - scheduler
+      - telemetry
+      - router
+    restart: unless-stopped

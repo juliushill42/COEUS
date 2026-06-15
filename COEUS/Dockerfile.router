@@ -1,0 +1,14 @@
+FROM golang:1.22-alpine AS builder
+WORKDIR /build
+COPY router/go.mod router/go.sum* ./
+RUN go mod download
+COPY router/ .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o coeus-router .
+
+FROM scratch
+COPY --from=builder /build/coeus-router /coeus-router
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+ENV COEUS_ROUTER_PORT=8082
+ENV COEUS_EVICTION_POLICY=sla
+EXPOSE 8082
+ENTRYPOINT ["/coeus-router"]
